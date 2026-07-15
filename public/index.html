@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Scriptline — every word, timestamped</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0C0E;
+    --panel:#16181C;
+    --panel-hi:#1D2024;
+    --border:#2A2D33;
+    --text:#F2F1ED;
+    --text-dim:#9A9DA6;
+    --text-mute:#5C6068;
+    --amber:#FFB100;
+    --amber-dim:rgba(255,177,0,0.14);
+    --teal:#5EEAD4;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .disp{font-family:'Space Grotesk',sans-serif;}
+
+  /* ---- topbar ---- */
+  header{display:flex;align-items:center;justify-content:space-between;padding:18px 28px;border-bottom:1px solid var(--border);}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand .mark{width:26px;height:26px;border-radius:6px;background:var(--amber);display:flex;align-items:center;justify-content:center;color:#0B0C0E;font-weight:700;font-size:13px;font-family:'IBM Plex Mono',monospace;}
+  .brand span{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:17px;letter-spacing:-0.01em;}
+  .brand small{color:var(--text-mute);font-size:12px;font-family:'IBM Plex Mono',monospace;margin-left:4px;}
+  header nav{color:var(--text-mute);font-size:13px;font-family:'IBM Plex Mono',monospace;}
+
+  main{max-width:1080px;margin:0 auto;padding:36px 24px 80px;}
+
+  /* ---- load bar ---- */
+  .loadbar{display:flex;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:8px;}
+  .loadbar input{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;padding:10px 12px;font-family:'IBM Plex Mono',monospace;}
+  .loadbar input::placeholder{color:var(--text-mute);}
+  .loadbar button{background:var(--amber);color:#0B0C0E;border:none;border-radius:6px;padding:0 20px;font-weight:600;font-family:'Space Grotesk',sans-serif;cursor:pointer;font-size:14px;transition:opacity .15s;}
+  .loadbar button:hover{opacity:.88;}
+  .loadbar button:disabled{opacity:.4;cursor:default;}
+  .hint{color:var(--text-mute);font-size:12.5px;margin:10px 2px 0;font-family:'IBM Plex Mono',monospace;}
+  .hint b{color:var(--text-dim);}
+
+  /* ---- scrubber (signature element) ---- */
+  .scrubber-wrap{margin-top:22px;display:none;}
+  .scrubber-wrap.show{display:block;}
+  .scrubber{position:relative;height:34px;background:var(--panel);border:1px solid var(--border);border-radius:8px;overflow:hidden;cursor:pointer;}
+  .scrubber .seg{position:absolute;top:0;bottom:0;border-right:1px solid var(--bg);}
+  .scrubber .tick{position:absolute;top:0;bottom:0;width:2px;background:var(--teal);opacity:.55;}
+  .scrubber .playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--amber);box-shadow:0 0 8px var(--amber);transition:left .15s linear;}
+  .scrubber-labels{display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-mute);margin-top:6px;}
+
+  /* ---- layout ---- */
+  .layout{display:none;grid-template-columns:280px 1fr;gap:24px;margin-top:28px;}
+  .layout.show{display:grid;}
+  .meta-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;height:fit-content;}
+  .meta-card img{width:100%;border-radius:8px;display:block;margin-bottom:12px;background:var(--panel-hi);}
+  .meta-card h2{font-family:'Space Grotesk',sans-serif;font-size:15px;margin:0 0 6px;line-height:1.35;}
+  .meta-card .chan{color:var(--text-dim);font-size:13px;margin-bottom:14px;}
+  .meta-card .stats{display:flex;gap:14px;font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--text-mute);border-top:1px solid var(--border);padding-top:12px;margin-bottom:14px;}
+  .dl-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .btn-ghost{flex:1;background:var(--panel-hi);border:1px solid var(--border);color:var(--text-dim);padding:8px 6px;border-radius:6px;font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;text-align:center;}
+  .btn-ghost:hover{color:var(--text);border-color:var(--text-mute);}
+  .btn-primary{width:100%;margin-top:10px;background:var(--amber);color:#0B0C0E;border:none;padding:10px;border-radius:6px;font-weight:600;font-family:'Space Grotesk',sans-serif;cursor:pointer;font-size:13px;}
+
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .tabs{display:flex;border-bottom:1px solid var(--border);}
+  .tab{padding:13px 18px;font-size:13.5px;font-family:'Space Grotesk',sans-serif;font-weight:500;color:var(--text-mute);cursor:pointer;border-bottom:2px solid transparent;}
+  .tab.active{color:var(--text);border-bottom-color:var(--amber);}
+  .tab-body{padding:16px 18px;max-height:560px;overflow-y:auto;}
+
+  .search-row{display:flex;gap:8px;margin-bottom:12px;}
+  .search-row input{flex:1;background:var(--panel-hi);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;outline:none;}
+
+  .line{display:flex;gap:12px;padding:7px 8px;border-radius:6px;cursor:pointer;}
+  .line:hover{background:var(--panel-hi);}
+  .line.active{background:var(--amber-dim);}
+  .line .ts{font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--amber);min-width:52px;padding-top:2px;}
+  .line .txt{font-size:14px;line-height:1.55;color:var(--text-dim);}
+  .line.active .txt{color:var(--text);}
+  mark{background:var(--amber);color:#0B0C0E;border-radius:2px;padding:0 1px;}
+
+  .summary-block h3{font-family:'Space Grotesk',sans-serif;font-size:14px;margin:18px 0 8px;}
+  .summary-block h3:first-child{margin-top:0;}
+  .summary-block p, .summary-block li{font-size:14px;line-height:1.6;color:var(--text-dim);}
+  .summary-block ul{padding-left:18px;}
+
+  .chat-log{display:flex;flex-direction:column;gap:10px;margin-bottom:12px;}
+  .msg{padding:10px 12px;border-radius:8px;font-size:13.5px;line-height:1.5;max-width:88%;}
+  .msg.user{background:var(--panel-hi);align-self:flex-end;color:var(--text);}
+  .msg.ai{background:transparent;border:1px solid var(--border);align-self:flex-start;color:var(--text-dim);}
+  .chat-row{display:flex;gap:8px;border-top:1px solid var(--border);padding-top:12px;}
+  .chat-row input{flex:1;background:var(--panel-hi);border:1px solid var(--border);border-radius:6px;padding:9px 12px;color:var(--text);font-size:13.5px;outline:none;}
+  .chat-row button{background:var(--amber);border:none;color:#0B0C0E;padding:0 16px;border-radius:6px;font-weight:600;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:13px;}
+
+  .empty{color:var(--text-mute);font-size:13.5px;text-align:center;padding:40px 10px;font-family:'IBM Plex Mono',monospace;}
+  .placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:70px 20px;color:var(--text-mute);text-align:center;}
+  .placeholder .disp{font-size:20px;color:var(--text-dim);margin-bottom:8px;}
+  .placeholder p{max-width:420px;font-size:13.5px;line-height:1.6;}
+
+  .setup-note{display:none;background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--amber);border-radius:6px;padding:12px 14px;margin-top:16px;font-size:12.5px;color:var(--text-dim);line-height:1.6;}
+  .setup-note.show{display:block;}
+  .setup-note code{background:var(--panel-hi);padding:1px 5px;border-radius:4px;font-family:'IBM Plex Mono',monospace;color:var(--amber);}
+
+  @media (max-width:760px){ .layout.show{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="mark">&gt;_</div>
+    <span>Scriptline</span>
+    <small>/transcripts</small>
+  </div>
+  <nav>every word, timestamped · no sign-up</nav>
+</header>
+
+<main>
+  <div class="loadbar">
+    <input id="urlInput" type="text" placeholder="Paste a YouTube link — youtube.com/watch?v=… or youtu.be/…" />
+    <button id="loadBtn">Load ▸</button>
+  </div>
+  <div class="hint">No sign-up. Paste any public video link. <b>Tip:</b> works with youtu.be, /shorts/, and full watch URLs.</div>
+
+  <div id="setupNote" class="setup-note">
+    Transcript extraction calls <code>/api/transcript</code> on this same server — it isn't reachable from a static
+    file preview. See <code>README.md</code> for the 2-minute backend setup (just Node, no API key needed).
+  </div>
+
+  <div class="scrubber-wrap" id="scrubberWrap">
+    <div class="scrubber" id="scrubber">
+      <div class="playhead" id="playhead" style="left:0%"></div>
+    </div>
+    <div class="scrubber-labels"><span id="tStart">00:00</span><span id="tEnd">00:00</span></div>
+  </div>
+
+  <div class="layout" id="layout">
+    <div class="meta-card">
+      <img id="thumb" src="" alt="" />
+      <h2 id="vidTitle">—</h2>
+      <div class="chan" id="vidChannel">—</div>
+      <div class="stats">
+        <span id="statDur">00:00</span>
+        <span id="statLines">0 lines</span>
+        <span id="statLang">EN</span>
+      </div>
+      <div class="dl-row">
+        <div class="btn-ghost" data-fmt="txt">.TXT</div>
+        <div class="btn-ghost" data-fmt="srt">.SRT</div>
+        <div class="btn-ghost" data-fmt="md">.MD</div>
+      </div>
+      <button class="btn-primary" id="copyAllBtn">Copy with timestamps</button>
+      <button class="btn-primary" id="copyPlainBtn" style="margin-top:8px;background:var(--panel-hi);color:var(--text);border:1px solid var(--border);">Copy plain text</button>
+    </div>
+
+    <div class="panel">
+      <div class="tabs">
+        <div class="tab active">Transcript</div>
+      </div>
+
+      <div class="tab-body" id="tab-transcript">
+        <div class="search-row">
+          <input id="searchInput" type="text" placeholder="Search inside this transcript…" />
+        </div>
+        <div id="lines"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="placeholder" id="emptyState">
+    <div class="disp">Paste a link above to pull its transcript</div>
+    <p>Scriptline extracts the full transcript with timestamps, then optionally summarizes it or lets you ask it questions — all in one place.</p>
+  </div>
+</main>
+
+<script>
+const $ = (s, el=document) => el.querySelector(s);
+const $$ = (s, el=document) => [...el.querySelectorAll(s)];
+
+let state = { videoId:null, meta:null, transcript:[], activeIndex:-1 };
+
+// If this page is embedded on WordPress (or anywhere) separate from the backend,
+// set this to your deployed backend URL, e.g. 'https://scriptline.onrender.com'
+// Leave as '' if this HTML is served BY the same backend (server.js's public/ folder).
+const API_BASE = '';
+
+function extractVideoId(url){
+  try{
+    const u = new URL(url.trim());
+    if(u.hostname.includes('youtu.be')) return u.pathname.slice(1);
+    if(u.pathname.startsWith('/shorts/')) return u.pathname.split('/')[2];
+    if(u.searchParams.get('v')) return u.searchParams.get('v');
+    return null;
+  }catch(e){ return null; }
+}
+
+function fmtTime(sec){
+  sec = Math.floor(sec);
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = sec%60;
+  const pad = n => String(n).padStart(2,'0');
+  return h>0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+}
+
+async function fetchMeta(videoId){
+  // oEmbed is public + CORS-enabled — real metadata, no backend needed.
+  const res = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+  if(!res.ok) throw new Error('oEmbed failed');
+  return res.json();
+}
+
+async function fetchTranscript(videoId){
+  const res = await fetch(`${API_BASE}/api/transcript?id=${videoId}`);
+  const data = await res.json().catch(() => ({}));
+  if(!res.ok) throw new Error(data.error || `backend not reachable (${res.status})`);
+  return data.transcript; // [{start, dur, text}]
+}
+
+function renderLines(lines, filter=''){
+  const wrap = $('#lines');
+  wrap.innerHTML = '';
+  const q = filter.trim().toLowerCase();
+  lines.forEach((l, i) => {
+    if(q && !l.text.toLowerCase().includes(q)) return;
+    const div = document.createElement('div');
+    div.className = 'line' + (i===state.activeIndex ? ' active' : '');
+    div.dataset.index = i;
+    const text = q ? l.text.replace(new RegExp(`(${q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')})`,'ig'), '<mark>$1</mark>') : l.text;
+    div.innerHTML = `<div class="ts">${fmtTime(l.start)}</div><div class="txt">${text}</div>`;
+    div.onclick = () => setActive(i, true);
+    wrap.appendChild(div);
+  });
+  if(wrap.children.length === 0){
+    wrap.innerHTML = `<div class="empty">No lines match "${filter}"</div>`;
+  }
+}
+
+function setActive(i, scroll){
+  state.activeIndex = i;
+  $$('.line').forEach(el => el.classList.toggle('active', +el.dataset.index === i));
+  if(scroll){
+    const el = $(`.line[data-index="${i}"]`);
+    if(el) el.scrollIntoView({block:'center', behavior:'smooth'});
+  }
+  updatePlayhead();
+}
+
+function updatePlayhead(){
+  const t = state.transcript;
+  if(!t.length) return;
+  const total = t[t.length-1].start + (t[t.length-1].dur || 3);
+  const cur = state.activeIndex >= 0 ? t[state.activeIndex].start : 0;
+  $('#playhead').style.left = `${Math.min(100,(cur/total)*100)}%`;
+}
+
+function buildScrubber(lines){
+  const scrubber = $('#scrubber');
+  $$('.seg, .tick', scrubber).forEach(e=>e.remove());
+  if(!lines.length) return;
+  const total = lines[lines.length-1].start + (lines[lines.length-1].dur || 3);
+  // naive "chapters": every ~20% of duration gets a tick, like scene markers
+  for(let p=0.2; p<1; p+=0.2){
+    const tick = document.createElement('div');
+    tick.className = 'tick';
+    tick.style.left = `${p*100}%`;
+    scrubber.appendChild(tick);
+  }
+  $('#tStart').textContent = '00:00';
+  $('#tEnd').textContent = fmtTime(total);
+  scrubber.onclick = (e) => {
+    const rect = scrubber.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width;
+    const targetTime = pct * total;
+    let idx = lines.findIndex(l => l.start > targetTime);
+    idx = idx === -1 ? lines.length-1 : Math.max(0, idx-1);
+    setActive(idx, true);
+  };
+}
+
+function toSRT(lines){
+  const pad3 = n => String(n).padStart(3,'0');
+  const srtTime = t => {
+    const h=Math.floor(t/3600), m=Math.floor((t%3600)/60), s=Math.floor(t%60), ms=Math.floor((t%1)*1000);
+    const p=(n,l=2)=>String(n).padStart(l,'0');
+    return `${p(h)}:${p(m)}:${p(s)},${pad3(ms)}`;
+  };
+  return lines.map((l,i)=>`${i+1}\n${srtTime(l.start)} --> ${srtTime(l.start+(l.dur||3))}\n${l.text}\n`).join('\n');
+}
+function toTXT(lines){ return lines.map(l=>`[${fmtTime(l.start)}] ${l.text}`).join('\n'); }
+function toMD(lines, title){ return `# ${title}\n\n` + lines.map(l=>`**${fmtTime(l.start)}** — ${l.text}`).join('\n\n'); }
+
+function download(filename, content){
+  const blob = new Blob([content], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function loadVideo(){
+  const raw = $('#urlInput').value;
+  const videoId = extractVideoId(raw);
+  if(!videoId){ alert('That doesn\'t look like a YouTube link. Try a full youtube.com/watch?v=… or youtu.be/… URL.'); return; }
+
+  const btn = $('#loadBtn');
+  btn.disabled = true; btn.textContent = 'Loading…';
+  $('#setupNote').classList.remove('show');
+
+  try{
+    const meta = await fetchMeta(videoId);
+    state.meta = meta; state.videoId = videoId;
+    $('#thumb').src = meta.thumbnail_url;
+    $('#vidTitle').textContent = meta.title;
+    $('#vidChannel').textContent = meta.author_name;
+    $('#layout').classList.add('show');
+    $('#emptyState').style.display = 'none';
+
+    let transcript;
+    try{
+      transcript = await fetchTranscript(videoId);
+    }catch(err){
+      $('#setupNote').classList.add('show');
+      $('#setupNote').textContent = err.message;
+      throw err;
+    }
+    state.transcript = transcript;
+
+    const total = transcript.length ? transcript[transcript.length-1].start : 0;
+    $('#statDur').textContent = fmtTime(total);
+    $('#statLines').textContent = `${transcript.length} lines`;
+    $('#statLang').textContent = 'EN';
+
+    renderLines(transcript);
+    buildScrubber(transcript);
+    $('#scrubberWrap').classList.add('show');
+    setActive(0, false);
+  }catch(err){
+    console.error(err);
+  }finally{
+    btn.disabled = false; btn.textContent = 'Load ▸';
+  }
+}
+
+$('#loadBtn').onclick = loadVideo;
+$('#urlInput').addEventListener('keydown', e => { if(e.key === 'Enter') loadVideo(); });
+
+$('#searchInput').addEventListener('input', e => renderLines(state.transcript, e.target.value));
+
+$$('.btn-ghost').forEach(btn => {
+  btn.onclick = () => {
+    if(!state.transcript.length) return;
+    const fmt = btn.dataset.fmt;
+    const title = (state.meta?.title || 'transcript').replace(/[^a-z0-9]+/gi,'_').slice(0,60);
+    if(fmt==='txt') download(`${title}.txt`, toTXT(state.transcript));
+    if(fmt==='srt') download(`${title}.srt`, toSRT(state.transcript));
+    if(fmt==='md') download(`${title}.md`, toMD(state.transcript, state.meta?.title || 'Transcript'));
+  };
+});
+
+function flashCopied(btn){
+  const old = btn.textContent; btn.textContent = 'Copied ✓';
+  setTimeout(()=>btn.textContent = old, 1500);
+}
+
+$('#copyAllBtn').onclick = async () => {
+  if(!state.transcript.length) return;
+  await navigator.clipboard.writeText(toTXT(state.transcript));
+  flashCopied($('#copyAllBtn'));
+};
+
+$('#copyPlainBtn').onclick = async () => {
+  if(!state.transcript.length) return;
+  const plain = state.transcript.map(l => l.text).join(' ');
+  await navigator.clipboard.writeText(plain);
+  flashCopied($('#copyPlainBtn'));
+};
+</script>
+</body>
+</html>
