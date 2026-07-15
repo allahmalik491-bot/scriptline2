@@ -1,0 +1,9 @@
+{
+  "name": "scriptline",
+  "compatibility_date": "2026-07-15",
+  "main": "worker.js",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS"
+  }
+}
